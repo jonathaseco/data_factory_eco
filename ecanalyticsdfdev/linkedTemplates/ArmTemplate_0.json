@@ -1,0 +1,316 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Nome do Data Factory",
+			"defaultValue": "ecanalyticsdfdev"
+		},
+		"AzureDataLakeStorage_accountKey": {
+			"type": "secureString",
+			"metadata": "Cadeia de caracteres segura para 'accountKey' de 'AzureDataLakeStorage'"
+		},
+		"AzureDataLakeStorage_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://ecsanalyticsdldev.dfs.core.windows.net/"
+		},
+		"SharepointGrupoecorodovias_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://grupoecorodovias.sharepoint.com/sites"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/pipeline1')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Set variable1",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "pipelineReturnValue",
+							"value": [
+								{
+									"key": "teste",
+									"value": {
+										"type": "String",
+										"content": "1"
+									}
+								}
+							],
+							"setSystemVariable": true
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureDataLakeStorage')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('AzureDataLakeStorage_properties_typeProperties_url')]",
+					"accountKey": {
+						"type": "SecureString",
+						"value": "[parameters('AzureDataLakeStorage_accountKey')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SharepointGrupoecorodovias')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "HttpServer",
+				"typeProperties": {
+					"url": "[parameters('SharepointGrupoecorodovias_properties_typeProperties_url')]",
+					"enableServerCertificateValidation": true,
+					"authenticationType": "Anonymous"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Runtime-sgp')]",
+			"type": "Microsoft.DataFactory/factories/integrationRuntimes",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "SelfHosted",
+				"typeProperties": {}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/integrationRuntime1')]",
+			"type": "Microsoft.DataFactory/factories/integrationRuntimes",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "Managed",
+				"typeProperties": {
+					"computeProperties": {
+						"location": "AutoResolve",
+						"dataFlowProperties": {
+							"computeType": "General",
+							"coreCount": 8,
+							"timeToLive": 10,
+							"cleanup": false,
+							"customProperties": []
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureDataLakeBinary')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeStorage",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": "camada_bronze/sharepoint/carregadores_eletricos/processar",
+						"fileSystem": "ecsanalyticsfs"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeStorage')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SharepointBinary')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "SharepointGrupoecorodovias",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"SharepointDominio": {
+						"type": "string"
+					},
+					"SharepointSite": {
+						"type": "string"
+					},
+					"CaminhoRelativo": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "HttpServerLocation",
+						"relativeUrl": {
+							"value": "@concat(dataset().SharepointSite,'/_api/web/GetFileByServerRelativeUrl(',dataset().SharepointSite,'/',dataset().CaminhoRelativo,')/$value')",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/SharepointGrupoecorodovias')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ingest_sharepoint_carregadores_eletricos')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "GetBearerToken",
+						"description": "Obtém Bearer Token do Sharepoint Eco.",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": "https://accounts.accesscontrol.windows.net/bf7db00b-6dcc-41f4-8148-8653bb3d6537/tokens/OAuth/2",
+							"method": "POST",
+							"headers": {
+								"Content-Type": "application/x-www-form-urlencoded"
+							},
+							"body": {
+								"value": "grant_type=client_credentials&client_id=fa8ee82d-0b82-49f7-96f4-5c75afa34628@bf7db00b-6dcc-41f4-8148-8653bb3d6537&client_secret=3E08Q~feNpWfFmEDrCJGWZq.~Y7phB.9v6i.Gav3&resource=00000003-0000-0ff1-ce00-000000000000/grupoecorodovias.sharepoint.com@bf7db00b-6dcc-41f4-8148-8653bb3d6537",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "CopyDataFromSharepoint",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "GetBearerToken",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "HttpReadSettings",
+									"requestMethod": "GET"
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings",
+									"copyBehavior": "PreserveHierarchy"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "SharepointBinary",
+								"type": "DatasetReference",
+								"parameters": {
+									"SharepointDominio": {
+										"value": "@pipeline().parameters.SharepointDominio",
+										"type": "Expression"
+									},
+									"SharepointSite": {
+										"value": "@pipeline().parameters.SharepointSite",
+										"type": "Expression"
+									},
+									"CaminhoRelativo": {
+										"value": "@pipeline().parameters.CaminhoRelativo",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "AzureDataLakeBinary",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {},
+					"cancelAfter": {}
+				},
+				"parameters": {
+					"SharepointDominio": {
+						"type": "string",
+						"defaultValue": "grupoecorodovias"
+					},
+					"SharepointSite": {
+						"type": "string",
+						"defaultValue": "teste_planilha"
+					},
+					"CaminhoRelativo": {
+						"type": "string",
+						"defaultValue": "Documentos Compartilhados/Fornecedores Bloqueados/"
+					}
+				},
+				"folder": {
+					"name": "01 - INGESTÃO"
+				},
+				"annotations": [],
+				"lastPublishTime": "2023-09-20T19:04:08Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/SharepointBinary')]",
+				"[concat(variables('factoryId'), '/datasets/AzureDataLakeBinary')]"
+			]
+		}
+	]
+}
