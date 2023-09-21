@@ -1,0 +1,118 @@
+{
+	"name": "ingest_sharepoint_carregadores_eletricos",
+	"properties": {
+		"activities": [
+			{
+				"name": "GetBearerToken",
+				"description": "Obtém Bearer Token do Sharepoint Eco.",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": "https://accounts.accesscontrol.windows.net/bf7db00b-6dcc-41f4-8148-8653bb3d6537/tokens/OAuth/2",
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/x-www-form-urlencoded"
+					},
+					"body": {
+						"value": "grant_type=client_credentials&client_id=fa8ee82d-0b82-49f7-96f4-5c75afa34628@bf7db00b-6dcc-41f4-8148-8653bb3d6537&client_secret=3E08Q~feNpWfFmEDrCJGWZq.~Y7phB.9v6i.Gav3&resource=00000003-0000-0ff1-ce00-000000000000/grupoecorodovias.sharepoint.com@bf7db00b-6dcc-41f4-8148-8653bb3d6537",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "CopyDataFromSharepoint",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "GetBearerToken",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "BinarySource",
+						"storeSettings": {
+							"type": "HttpReadSettings",
+							"requestMethod": "GET"
+						},
+						"formatSettings": {
+							"type": "BinaryReadSettings"
+						}
+					},
+					"sink": {
+						"type": "BinarySink",
+						"storeSettings": {
+							"type": "AzureBlobFSWriteSettings",
+							"copyBehavior": "PreserveHierarchy"
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "SharepointBinary",
+						"type": "DatasetReference",
+						"parameters": {
+							"SharepointDominio": {
+								"value": "@pipeline().parameters.SharepointDominio",
+								"type": "Expression"
+							},
+							"SharepointSite": {
+								"value": "@pipeline().parameters.SharepointSite",
+								"type": "Expression"
+							},
+							"CaminhoRelativo": {
+								"value": "@pipeline().parameters.CaminhoRelativo",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "AzureDataLakeBinary",
+						"type": "DatasetReference"
+					}
+				]
+			}
+		],
+		"parameters": {
+			"SharepointDominio": {
+				"type": "string",
+				"defaultValue": "grupoecorodovias"
+			},
+			"SharepointSite": {
+				"type": "string",
+				"defaultValue": "teste_planilha"
+			},
+			"CaminhoRelativo": {
+				"type": "string",
+				"defaultValue": "Documentos Compartilhados/Fornecedores Bloqueados/"
+			}
+		},
+		"folder": {
+			"name": "01 - INGESTÃO"
+		},
+		"annotations": [],
+		"lastPublishTime": "2023-09-20T19:04:08Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

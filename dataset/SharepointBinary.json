@@ -1,0 +1,32 @@
+{
+	"name": "SharepointBinary",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "SharepointGrupoecorodovias",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"SharepointDominio": {
+				"type": "string"
+			},
+			"SharepointSite": {
+				"type": "string"
+			},
+			"CaminhoRelativo": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "HttpServerLocation",
+				"relativeUrl": {
+					"value": "@concat(dataset().SharepointSite,'/_api/web/GetFileByServerRelativeUrl(',dataset().SharepointSite,'/',dataset().CaminhoRelativo,')/$value')",
+					"type": "Expression"
+				}
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

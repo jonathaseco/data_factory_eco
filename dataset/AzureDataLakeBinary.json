@@ -1,0 +1,19 @@
+{
+	"name": "AzureDataLakeBinary",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureDataLakeStorage",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"folderPath": "camada_bronze/sharepoint/carregadores_eletricos/processar",
+				"fileSystem": "ecsanalyticsfs"
+			}
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

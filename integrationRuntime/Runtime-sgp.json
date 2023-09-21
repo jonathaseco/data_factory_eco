@@ -1,0 +1,6 @@
+{
+	"name": "Runtime-sgp",
+	"properties": {
+		"type": "SelfHosted"
+	}
+}
